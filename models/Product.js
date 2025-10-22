@@ -33,12 +33,12 @@ const productSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    default: "No Category",
+    default: "No-Category",
   },
   model: {
     type: String,
     required: true,
-    default: "No Model",
+    default: "No-Model",
   },
   brand: {
     type: String,
