@@ -33,6 +33,7 @@ const productSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
+    default: "No Category",
   },
   model: {
     type: String,
