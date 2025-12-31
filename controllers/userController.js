@@ -3,7 +3,20 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import axios from "axios";
+import nodemailer from "nodemailer";
+import Otp from "../models/Otp.js";
 dotenv.config();
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: "kavishimethmini2001@gmail.com",
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
 export function createUser(req, res) {
   const data = req.body;
@@ -37,7 +50,13 @@ export function loginUser(req, res) {
       });
     } else {
       const user = users[0];
-      console.log(user);
+
+      if (user.isBlocked) {
+        res.status(403).json({
+          message: "User is blocked. Contact admin.",
+        });
+        return;
+      }
 
       const isPasswordCorrect = bcrypt.compareSync(password, user.password);
 
@@ -167,3 +186,145 @@ export async function googleLogin(req, res) {
     });
   }
 }
+
+export async function validateOTPAndUpdatePassword(req, res) {
+  try {
+    const otp = req.body.otp;
+    const newPassword = req.body.newPassword;
+    const email = req.body.email;
+
+    const otpRecord = await Otp.findOne({ email: email, otp: otp });
+    if (otpRecord == null) {
+      res.status(400).json({
+        message: "Invalid OTP",
+      });
+      return;
+    }
+
+    await Otp.deleteMany({ email: email });
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+
+    await User.updateOne(
+      { email: email },
+      {
+        $set: { password: hashedPassword, isEmailVerified: true },
+      },
+    );
+    res.json({
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update password",
+      error: error.message,
+    });
+  }
+}
+
+export async function sendOTP(req, res) {
+  try {
+    const email = req.params.email;
+    const user = await User.findOne({
+      email: email,
+    });
+    if (user == null) {
+      res.status(404).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    await Otp.deleteMany({
+      email: email,
+    });
+
+    //generate random 6 digit otp
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const otp = new Otp({
+      email: email,
+      otp: otpCode,
+    });
+
+    await otp.save();
+
+    const message = {
+      from: "kavishimethmini2001@gmail.com",
+      to: email,
+      subject: "Your OTP Code",
+      text: "Your OTP code is " + otpCode,
+    };
+
+    transporter.sendMail(message, (err, info) => {
+      if (err) {
+        res.status(500).json({
+          message: "Failed to send OTP",
+          error: err.message,
+        });
+      } else {
+        res.json({
+          message: "OTP sent successfully",
+        });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to send OTP",
+      error: error.message,
+    });
+  }
+}
+
+export async function getAllUsers(req, res) {
+  if (!isAdmin(req)) {
+    res.status(401).json({
+      message: "Unauthorized",
+    });
+    return;
+  }
+
+  try {
+    const users = await User.find();
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching users",
+      error: error.message,
+    });
+  }
+}
+
+export async function updateUserStatus(req, res) {
+  if (!isAdmin(req)) {
+    res.status(401).json({
+      message: "Unauthorized",
+    });
+    return;
+  }
+
+  const email = req.params.email;
+
+  if (req.user.email === email) {
+    res.status(400).json({
+      message: "Admin cannot change their own status",
+    });
+    return;
+  }
+
+  const isBlocked = req.body.isBlocked;
+
+  try {
+    await User.updateOne({ email: email }, { $set: { isBlocked: isBlocked } });
+    res.json({
+      message: "User status updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error updating user status",
+      error: error.message,
+    });
+  }
+}
+
+//add try catch for async-await

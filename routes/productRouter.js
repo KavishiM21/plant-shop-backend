@@ -1,22 +1,35 @@
-import express from "express"
-import { createProduct, deleteProduct, getAllProducts, getProductByID, updateProduct } from "../controllers/productController.js"
+import express from "express";
+import {
+  createProduct,
+  deleteProduct,
+  filterProducts,
+  getAllProducts,
+  getProductByID,
+  getProductCategories,
+  searchProducts,
+  updateProduct,
+} from "../controllers/productController.js";
 
-const productRouter = express.Router()
+const productRouter = express.Router();
 
-productRouter.get("/", getAllProducts)
+productRouter.get("/", getAllProducts);
 
-productRouter.get("/trending", (req,res)=>{
-    res.json(
-        {message : "trending products endpoint"}
-    )
-})
+productRouter.get("/trending", (req, res) => {
+  res.json({ message: "trending products endpoint" });
+});
 
-productRouter.post("/", createProduct)
+productRouter.post("/", createProduct);
 
-productRouter.get("/:productID", getProductByID)
+productRouter.get("/categories/list", getProductCategories);
 
-productRouter.delete("/:productID", deleteProduct)
+productRouter.get("/filter", filterProducts);
 
-productRouter.put("/:productID", updateProduct)  
+productRouter.get("/:search/:query", searchProducts);
 
-export default productRouter
+productRouter.get("/:productID", getProductByID);
+
+productRouter.delete("/:productID", deleteProduct);
+
+productRouter.put("/:productID", updateProduct);
+
+export default productRouter;
